@@ -9,6 +9,7 @@ import {
   EDITOR_SELECT_EVENT,
   EDITOR_TYPE,
   MOBILE_KEYS,
+  PROGRESS_POSITIONS,
   SCREEN_PRESETS,
   SYNC_DOMAINS,
   WEEKDAYS,
@@ -1053,6 +1054,7 @@ export class HACardTabsEditor extends LitElement {
       ],
       animation: ANIMATIONS.map((name) => [name, `anim_${name}`]),
       animation_easing: Object.keys(EASINGS).map((name) => [name, `easing_${name}`]),
+      progress_position: PROGRESS_POSITIONS.map((name) => [name, `progress_${name}`]),
       sync_mode: [
         ["both", "sync_both"],
         ["read", "sync_read"],
@@ -1179,6 +1181,11 @@ export class HACardTabsEditor extends LitElement {
         { name: "pause_on_hover", selector: { boolean: {} } },
         { name: "show_progress", selector: { boolean: {} } },
       );
+      if (autoCycle.show_progress) {
+        cycleSchema.push(
+          this._grid(this._selectField("progress_position"), this._numberField("progress_height", 1, 20, "px")),
+        );
+      }
     }
     const cycleKeys = schemaKeys(cycleSchema);
     const data = { ...DEFAULTS, ...this._config };

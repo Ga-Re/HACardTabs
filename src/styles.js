@@ -531,7 +531,7 @@ export const cardStyles = css`
     flex-direction: column-reverse;
   }
   .progress {
-    height: 3px;
+    height: var(--hct-progress-height, 3px);
     flex: 0 0 auto;
     overflow: hidden;
     background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.06);
@@ -546,6 +546,34 @@ export const cardStyles = css`
   }
   .progress .bar.paused {
     animation-play-state: paused;
+  }
+  /* progress inside the active tab: uses the tab's text color */
+  .progress.progress-tab {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 5px;
+    border-radius: 2px;
+    background: none;
+    pointer-events: none;
+  }
+  .progress.progress-tab::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0.25;
+  }
+  .progress.progress-tab .bar {
+    position: relative;
+    background: currentColor;
+  }
+  .tab.icon-top .progress.progress-tab {
+    bottom: 2px;
+  }
+  .pos-bottom .style-underline .progress.progress-tab {
+    bottom: auto;
+    top: 5px;
   }
   @keyframes hct-progress {
     from {

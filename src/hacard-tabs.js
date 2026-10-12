@@ -3,7 +3,15 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { keyed } from "lit/directives/keyed.js";
 
-import { AUTO_CYCLE_DEFAULTS, CARD_TYPE, DEFAULTS, EDITOR_SELECT_EVENT, EDITOR_TYPE, VERSION } from "./const.js";
+import {
+  AUTO_CYCLE_DEFAULTS,
+  CARD_TYPE,
+  DEFAULTS,
+  EDITOR_SELECT_EVENT,
+  EDITOR_TYPE,
+  PROGRESS_POSITIONS,
+  VERSION,
+} from "./const.js";
 import {
   collectConditions,
   conditionTemplates,
@@ -318,6 +326,7 @@ export class HACardTabs extends LitElement {
       "--hct-padding": px(cfg.content_padding),
       "--hct-anim-duration": `${this._animationDuration()}ms`,
       "--hct-anim-easing": EASINGS[cfg.animation_easing] || "ease",
+      "--hct-progress-height": px(cfg.auto_cycle.progress_height),
     };
 
     return html`
@@ -338,11 +347,11 @@ export class HACardTabs extends LitElement {
         @touchend=${{ handleEvent: (ev) => this._onTouchEnd(ev), passive: true }}
         @touchcancel=${{ handleEvent: () => this._onTouchCancel(), passive: true }}
       >
-        ${cfg.title ? html`<div class="title">${cfg.title}</div>` : nothing}
+        ${this._renderProgress("card_top")} ${cfg.title ? html`<div class="title">${cfg.title}</div>` : nothing}
         <div class="root pos-${position}">
           ${this._renderBar(position, vertical)}
           <div class="body">
-            ${this._renderProgress()}
+            ${this._renderProgress("bar")}
             <div
               class=${classMap({ content: true, "fixed-height": Boolean(contentHeight) })}
               style=${styleMap({ height: contentHeight })}
@@ -350,9 +359,10 @@ export class HACardTabs extends LitElement {
             >
               <div class="viewport"></div>
             </div>
+            ${this._renderProgress("content_end")}
           </div>
         </div>
-        ${this._renderMenu()}
+        ${this._renderProgress("card_bottom")} ${this._renderMenu()}
       </ha-card>
     `;
   }
@@ -492,6 +502,7 @@ export class HACardTabs extends LitElement {
       >
         ${showIcon ? html`<ha-icon .icon=${display.icon}></ha-icon>` : nothing}
         ${showName ? html`<span class="label">${display.name}</span>` : nothing}
+        ${active ? this._renderProgress("tab") : nothing}
         ${display.badge !== undefined
           ? html`<span
               class=${classMap({ badge: true, dot: Boolean(tab.badge_dot) })}
@@ -508,13 +519,15 @@ export class HACardTabs extends LitElement {
     `;
   }
 
-  _renderProgress() {
+  _renderProgress(place) {
     const ac = this._config.auto_cycle;
     if (!this._cycleActive || !ac.show_progress) return nothing;
+    const position = PROGRESS_POSITIONS.includes(ac.progress_position) ? ac.progress_position : "bar";
+    if (position !== place) return nothing;
     const color = cssColor(this._tabDisplay(this._active).color) ?? cssColor(this._config.color);
     return keyed(
       this._cycleKey,
-      html`<div class="progress">
+      html`<div class="progress progress-${place}">
         <div
           class=${classMap({ bar: true, paused: this._cyclePaused })}
           style=${styleMap({

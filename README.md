@@ -209,7 +209,17 @@ auto_cycle:
   pause_on_interaction: 30 # nach Klick/Touch so lange pausieren (0 = nicht pausieren)
   pause_on_hover: true # pausieren, solange die Maus über der Karte ist
   show_progress: true # Fortschrittsbalken anzeigen
+  progress_position: bar # bar, content_end, card_top, card_bottom, tab
+  progress_height: 3 # Dicke in px
 ```
+
+| `progress_position` | Position des Fortschrittsbalkens                             |
+| ------------------- | ------------------------------------------------------------ |
+| `bar` (Standard)    | Direkt an der Tab-Leiste                                     |
+| `content_end`       | Am anderen Ende des Inhalts (bei Tab-Leiste oben also unten) |
+| `card_top`          | Ganz oben am Kartenrand                                      |
+| `card_bottom`       | Ganz unten am Kartenrand                                     |
+| `tab`               | Im aktiven Tab (nimmt die Textfarbe des Tabs an)             |
 
 Gewechselt wird nur zwischen sichtbaren Tabs. Tabs mit `skip_cycle: true` werden übersprungen, `cycle_duration`
 überschreibt das Intervall für einen einzelnen Tab.
