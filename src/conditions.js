@@ -99,25 +99,46 @@ export function checkCondition(condition, ctx) {
   }
 }
 
-/** Evaluates the visibility of a tab. */
-export function tabVisible(tab, ctx) {
-  const conditions = asArray(tab?.conditions);
+/** Evaluates a list of conditions combined with "all" (AND, default) or "any" (OR). */
+export function conditionsMet(list, mode, ctx) {
+  const conditions = asArray(list);
   if (!conditions.length) return true;
-  return tab.condition_mode === "any"
+  return mode === "any"
     ? conditions.some((c) => checkCondition(c, ctx))
     : conditions.every((c) => checkCondition(c, ctx));
 }
 
-/** Walks all conditions (including nested groups) of all tabs. */
-export function collectConditions(tabs) {
+/** Evaluates the visibility of a tab (disabled tabs are never visible). */
+export function tabVisible(tab, ctx) {
+  if (tab?.disabled) return false;
+  return conditionsMet(tab?.conditions, tab?.condition_mode, ctx);
+}
+
+/** Walks a list of conditions including nested groups. */
+export function flattenConditions(list) {
   const result = [];
-  const walk = (list) => {
-    for (const condition of asArray(list)) {
+  const walk = (items) => {
+    for (const condition of asArray(items)) {
       if (!condition || typeof condition !== "object") continue;
       result.push(condition);
       if (condition.conditions) walk(condition.conditions);
     }
   };
-  for (const tab of asArray(tabs)) walk(tab?.conditions);
+  walk(list);
   return result;
+}
+
+/** All conditions (visibility and jump conditions, including nested groups) of all tabs. */
+export function collectConditions(tabs) {
+  return asArray(tabs).flatMap((tab) => [
+    ...flattenConditions(tab?.conditions),
+    ...flattenConditions(tab?.jump_conditions),
+  ]);
+}
+
+/** Templates used by template conditions in a condition list. */
+export function conditionTemplates(list) {
+  return flattenConditions(list)
+    .filter((c) => conditionType(c) === "template" && c.value_template)
+    .map((c) => String(c.value_template));
 }
