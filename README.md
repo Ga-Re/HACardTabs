@@ -243,7 +243,8 @@ npm run dev     # baut bei Änderungen neu und startet http://localhost:5055/dev
 Karten-Editoren usw.), damit du Karte und Editor ohne laufende Home-Assistant-Instanz ausprobieren kannst.
 
 Für einen neuen Release `version` in `package.json` und `VERSION` in `src/const.js` erhöhen, dann einen Tag pushen
-(`git tag v1.1.0 && git push origin v1.1.0`). Der Workflow `release.yml` baut die Karte und veröffentlicht den
+(`git tag v1.1.0 && git push origin v1.1.0`) oder auf GitHub unter **Actions → Release → Run workflow** die Version
+eingeben. Der Workflow `release.yml` baut die Karte und veröffentlicht den
 Release mit `hacardtabs.js` als Anhang.
 
 ---
