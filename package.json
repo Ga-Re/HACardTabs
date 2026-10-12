@@ -1,0 +1,34 @@
+{
+  "name": "hacardtabs",
+  "version": "1.0.0",
+  "description": "Home Assistant Lovelace card with configurable tabs – every tab is a section that holds other cards.",
+  "type": "module",
+  "main": "dist/hacardtabs.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c --watch",
+    "dev": "rollup -c --watch & http-server -c-1 -p 5055 ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ga-Re/HACardTabs.git"
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "custom-card",
+    "tabs",
+    "hacs"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.3.0"
+  },
+  "devDependencies": {
+    "@mdi/js": "^7.4.47",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-terser": "^1.0.0",
+    "http-server": "^14.1.1",
+    "rollup": "^4.40.0"
+  }
+}
