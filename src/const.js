@@ -1,4 +1,4 @@
-export const VERSION = "1.1.0";
+export const VERSION = "1.2.0";
 
 export const CARD_TYPE = "hacard-tabs";
 export const EDITOR_TYPE = "hacard-tabs-editor";
@@ -52,7 +52,12 @@ export const AUTO_CYCLE_DEFAULTS = {
   pause_on_interaction: 30,
   pause_on_hover: true,
   show_progress: true,
+  progress_position: "bar",
+  progress_height: 3,
 };
+
+/** Where the auto-rotation progress bar can be placed. */
+export const PROGRESS_POSITIONS = ["bar", "content_end", "card_top", "card_bottom", "tab"];
 
 /** Home Assistant named colors that map to `var(--<name>-color)`. */
 export const HA_COLORS = [
