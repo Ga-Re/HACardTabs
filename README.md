@@ -242,8 +242,9 @@ npm run dev     # baut bei Änderungen neu und startet http://localhost:5055/dev
 `dev/index.html` ist eine Testseite mit einem simulierten Home Assistant (Platzhalter für `ha-form`, die
 Karten-Editoren usw.), damit du Karte und Editor ohne laufende Home-Assistant-Instanz ausprobieren kannst.
 
-Einen neuen Release erstellst du auf GitHub. Der Workflow `release.yml` baut die Karte und hängt
-`hacardtabs.js` an den Release an.
+Für einen neuen Release `version` in `package.json` und `VERSION` in `src/const.js` erhöhen, dann einen Tag pushen
+(`git tag v1.1.0 && git push origin v1.1.0`). Der Workflow `release.yml` baut die Karte und veröffentlicht den
+Release mit `hacardtabs.js` als Anhang.
 
 ---
 
