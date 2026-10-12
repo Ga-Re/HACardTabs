@@ -8,9 +8,12 @@ import {
   DEFAULTS,
   EDITOR_SELECT_EVENT,
   EDITOR_TYPE,
+  MOBILE_KEYS,
   SCREEN_PRESETS,
+  SYNC_DOMAINS,
   WEEKDAYS,
 } from "./const.js";
+import { ANIMATIONS, EASINGS } from "./animations.js";
 import { conditionType } from "./conditions.js";
 import { localize } from "./localize.js";
 import { cssColor, fireEvent, loadHaComponents, toHex } from "./utils.js";
@@ -145,14 +148,56 @@ export class HACardTabsEditor extends LitElement {
     `;
   }
 
+  /** Renders an ha-form; `onChange` receives the changed values. */
+  _form(data, schema, onChange, computeLabel = this._computeLabel) {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${data}
+        .schema=${schema}
+        .computeLabel=${computeLabel}
+        .computeHelper=${this._computeHelper}
+        @value-changed=${(ev) => {
+          ev.stopPropagation();
+          onChange({ ...ev.detail.value });
+        }}
+      ></ha-form>
+    `;
+  }
+
+  /** Collapsible section. */
+  _panel(key, icon, content, open = false) {
+    return html`
+      <details class="panel" ?open=${open}>
+        <summary>
+          <ha-icon .icon=${icon}></ha-icon>
+          <span>${this._t(key)}</span>
+          <ha-icon class="chevron" icon="mdi:chevron-down"></ha-icon>
+        </summary>
+        <div class="panel-body">${content}</div>
+      </details>
+    `;
+  }
+
   _computeLabel = (schema) => {
     const map = { media_query: "media_query", value_template: "value_template" };
     return this._t(map[schema.name] || schema.name);
   };
 
   _computeHelper = (schema) => {
-    if (schema.name === "state") return this._t("state_helper");
-    return undefined;
+    const helpers = {
+      state: "state_helper",
+      id: "id_helper",
+      badge: "badge_helper",
+      name_template: "template_helper",
+      icon_template: "template_helper",
+      color_template: "template_helper",
+      jump_return: "jump_return_helper",
+      sync_entity: "sync_entity_helper",
+      mobile_breakpoint: "mobile_breakpoint_helper",
+      content_height: "content_height_helper",
+    };
+    return helpers[schema.name] ? this._t(helpers[schema.name]) : undefined;
   };
 
   /* ------------------------------------------------------------------ */
@@ -203,14 +248,19 @@ export class HACardTabsEditor extends LitElement {
           (tab, index) => html`
             <button
               type="button"
-              class="chip ${index === this._selectedTab ? "active" : ""}"
+              class="chip ${index === this._selectedTab ? "active" : ""} ${tab.disabled ? "disabled" : ""}"
               style=${cssColor(tab.color) ? `--chip-color: ${cssColor(tab.color)}` : ""}
               @click=${() => this._selectTab(index)}
             >
               ${tab.icon ? html`<ha-icon .icon=${tab.icon}></ha-icon>` : nothing}
               <span>${this._tabName(tab, index)}</span>
-              ${asArray(tab.conditions).length
-                ? html`<ha-icon class="mini" icon="mdi:eye-check-outline"></ha-icon>`
+              ${tab.disabled
+                ? html`<ha-icon class="mini" icon="mdi:cancel"></ha-icon>`
+                : asArray(tab.conditions).length
+                  ? html`<ha-icon class="mini" icon="mdi:eye-check-outline"></ha-icon>`
+                  : nothing}
+              ${asArray(tab.jump_conditions).length
+                ? html`<ha-icon class="mini" icon="mdi:debug-step-into"></ha-icon>`
                 : nothing}
             </button>
           `,
@@ -250,8 +300,8 @@ export class HACardTabsEditor extends LitElement {
                   <ha-icon .icon=${icon}></ha-icon>
                   <span>${this._t(`tab_${page}`)}</span>
                   ${page === "cards" ? html`<span class="count">${cardCount}</span>` : nothing}
-                  ${page === "conditions" && conditionCount
-                    ? html`<span class="count">${conditionCount}</span>`
+                  ${page === "conditions" && conditionCount + asArray(tab.jump_conditions).length
+                    ? html`<span class="count">${conditionCount + asArray(tab.jump_conditions).length}</span>`
                     : nothing}
                 </button>
               `,
@@ -283,7 +333,13 @@ export class HACardTabsEditor extends LitElement {
   }
 
   _renderTabGeneral(index, tab) {
-    const schema = [
+    const update =
+      (keys, defaults = {}) =>
+      (values) => {
+        if (values.columns !== undefined) values.columns = Number(values.columns) || undefined;
+        this._updateTab(index, (current) => applyValues(current, values, keys, defaults));
+      };
+    const main = [
       {
         type: "grid",
         name: "",
@@ -296,13 +352,14 @@ export class HACardTabsEditor extends LitElement {
         type: "grid",
         name: "",
         schema: [
-          { name: "badge_entity", selector: { entity: {} } },
           { name: "columns", selector: { number: { min: 1, max: 6, mode: "box" } } },
+          { name: "id", selector: { text: {} } },
         ],
       },
+      { name: "disabled", selector: { boolean: {} } },
     ];
     if (this._config.auto_cycle?.enabled) {
-      schema.push({
+      main.push({
         type: "grid",
         name: "",
         schema: [
@@ -314,20 +371,52 @@ export class HACardTabsEditor extends LitElement {
         ],
       });
     }
-    const keys = schemaKeys(schema);
+    const badge = [
+      { name: "badge_entity", selector: { entity: {} } },
+      { name: "badge", selector: { text: {} } },
+      { name: "badge_dot", selector: { boolean: {} } },
+    ];
+    const dynamic = [
+      { name: "name_template", selector: { template: {} } },
+      { name: "icon_template", selector: { template: {} } },
+      { name: "color_template", selector: { template: {} } },
+    ];
+    const actions = [
+      { name: "hold_action", selector: { ui_action: {} } },
+      { name: "double_tap_action", selector: { ui_action: {} } },
+    ];
+    const hasDynamic = dynamic.some((item) => tab[item.name]);
+    const hasActions = actions.some((item) => tab[item.name]);
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${{ columns: 1, ...tab }}
-        .schema=${schema}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${(ev) => {
-          ev.stopPropagation();
-          const values = { ...ev.detail.value };
-          if (values.columns !== undefined) values.columns = Number(values.columns) || undefined;
-          this._updateTab(index, (current) => applyValues(current, values, keys, { columns: 1, skip_cycle: false }));
-        }}
-      ></ha-form>
+      ${this._form(
+        { columns: 1, ...tab },
+        main,
+        update(schemaKeys(main), { columns: 1, skip_cycle: false, disabled: false }),
+      )}
+      ${this._panel(
+        "section_badge",
+        "mdi:numeric-1-circle-outline",
+        html`
+          ${this._form(tab, badge, update(schemaKeys(badge), { badge_dot: false }))}
+          ${this._renderColorField("badge_color", tab.badge_color, (value) =>
+            this._updateTab(index, (current) => applyValues(current, { badge_color: value }, ["badge_color"])),
+          )}
+        `,
+        Boolean(tab.badge_entity || tab.badge),
+      )}
+      ${this._panel(
+        "section_dynamic",
+        "mdi:code-braces",
+        this._form(tab, dynamic, update(schemaKeys(dynamic))),
+        hasDynamic,
+      )}
+      ${this._panel(
+        "section_actions",
+        "mdi:gesture-tap-hold",
+        html`<div class="hint small">${this._t("actions_helper")}</div>
+          ${this._form(tab, actions, update(schemaKeys(actions)))}`,
+        hasActions,
+      )}
     `;
   }
 
@@ -560,47 +649,72 @@ export class HACardTabsEditor extends LitElement {
   /* ---------- Conditions ---------- */
 
   _renderTabConditions(index, tab) {
-    const conditions = asArray(tab.conditions);
     if (!this._users) this._loadUsers();
+    const jumpCount = asArray(tab.jump_conditions).length;
     return html`
       <div class="hint">${this._t("conditions_helper")}</div>
+      ${this._renderConditionList(index, tab, "conditions", "condition_mode")}
+      ${this._panel(
+        "section_jump",
+        "mdi:debug-step-into",
+        html`
+          <div class="hint">${this._t("jump_helper")}</div>
+          ${this._renderConditionList(index, tab, "jump_conditions", "jump_condition_mode")}
+          ${jumpCount
+            ? this._form(
+                tab,
+                [
+                  {
+                    name: "jump_return",
+                    selector: { number: { min: 0, max: 86400, mode: "box", unit_of_measurement: "s" } },
+                  },
+                ],
+                (values) =>
+                  this._updateTab(index, (current) =>
+                    applyValues(current, values, ["jump_return"], { jump_return: 0 }),
+                  ),
+              )
+            : nothing}
+        `,
+        jumpCount > 0,
+      )}
+    `;
+  }
+
+  _renderConditionList(index, tab, listKey, modeKey) {
+    const conditions = asArray(tab[listKey]);
+    return html`
       ${conditions.length > 1
-        ? html`
-            <ha-form
-              .hass=${this.hass}
-              .data=${{ condition_mode: tab.condition_mode || "all" }}
-              .schema=${[
-                {
-                  name: "condition_mode",
-                  selector: {
-                    select: {
-                      mode: "dropdown",
-                      options: [
-                        { value: "all", label: this._t("condition_mode_all") },
-                        { value: "any", label: this._t("condition_mode_any") },
-                      ],
-                    },
+        ? this._form(
+            { [modeKey]: tab[modeKey] || "all" },
+            [
+              {
+                name: modeKey,
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: [
+                      { value: "all", label: this._t("condition_mode_all") },
+                      { value: "any", label: this._t("condition_mode_any") },
+                    ],
                   },
                 },
-              ]}
-              .computeLabel=${this._computeLabel}
-              @value-changed=${(ev) => {
-                ev.stopPropagation();
-                const mode = ev.detail.value.condition_mode;
-                this._updateTab(index, (current) =>
-                  applyValues(current, { condition_mode: mode }, ["condition_mode"], { condition_mode: "all" }),
-                );
-              }}
-            ></ha-form>
-          `
+              },
+            ],
+            (values) =>
+              this._updateTab(index, (current) => applyValues(current, values, [modeKey], { [modeKey]: "all" })),
+            () => this._t(listKey === "conditions" ? "condition_mode" : "jump_condition_mode"),
+          )
         : nothing}
-      ${conditions.map((condition, conditionIndex) => this._renderCondition(index, condition, conditionIndex))}
+      ${conditions.map((condition, conditionIndex) =>
+        this._renderCondition(index, condition, conditionIndex, listKey, modeKey),
+      )}
       <div class="add-condition">
         <div class="label">${this._t("add_condition")}</div>
         <div class="chips small">
           ${CONDITION_TYPES.map(
             (type) => html`
-              <button type="button" class="chip small" @click=${() => this._addCondition(index, type)}>
+              <button type="button" class="chip small" @click=${() => this._addCondition(index, type, listKey)}>
                 <ha-icon .icon=${CONDITION_ICONS[type]}></ha-icon>
                 <span>${this._t(`cond_${type}`)}</span>
               </button>
@@ -611,7 +725,7 @@ export class HACardTabsEditor extends LitElement {
     `;
   }
 
-  _renderCondition(tabIndex, condition, conditionIndex) {
+  _renderCondition(tabIndex, condition, conditionIndex, listKey, modeKey) {
     const type = conditionType(condition);
     const schema = this._conditionSchema(type, condition);
     return html`
@@ -622,25 +736,15 @@ export class HACardTabsEditor extends LitElement {
           ${this._iconButton(
             "mdi:delete-outline",
             this._t("delete"),
-            () => this._removeCondition(tabIndex, conditionIndex),
+            () => this._removeCondition(tabIndex, conditionIndex, listKey, modeKey),
             false,
             "danger",
           )}
         </div>
         ${schema
-          ? html`
-              <ha-form
-                .hass=${this.hass}
-                .data=${this._conditionToForm(type, condition)}
-                .schema=${schema}
-                .computeLabel=${this._computeLabel}
-                .computeHelper=${this._computeHelper}
-                @value-changed=${(ev) => {
-                  ev.stopPropagation();
-                  this._setCondition(tabIndex, conditionIndex, this._formToCondition(type, ev.detail.value));
-                }}
-              ></ha-form>
-            `
+          ? this._form(this._conditionToForm(type, condition), schema, (values) =>
+              this._setCondition(tabIndex, conditionIndex, this._formToCondition(type, values), listKey),
+            )
           : html`
               <div class="hint small">${this._t("cond_yaml_only")}</div>
               <pre>${JSON.stringify(condition, null, 2)}</pre>
@@ -777,7 +881,7 @@ export class HACardTabsEditor extends LitElement {
     return condition;
   }
 
-  _addCondition(tabIndex, type) {
+  _addCondition(tabIndex, type, listKey = "conditions") {
     const defaults = {
       state: { condition: "state", entity: "", state: "on" },
       numeric_state: { condition: "numeric_state", entity: "" },
@@ -788,26 +892,27 @@ export class HACardTabsEditor extends LitElement {
     };
     this._updateTab(tabIndex, (tab) => ({
       ...tab,
-      conditions: [...asArray(tab.conditions), defaults[type] || { condition: type }],
+      [listKey]: [...asArray(tab[listKey]), defaults[type] || { condition: type }],
     }));
   }
 
-  _setCondition(tabIndex, conditionIndex, condition) {
+  _setCondition(tabIndex, conditionIndex, condition, listKey = "conditions") {
     this._updateTab(tabIndex, (tab) => {
-      const conditions = [...asArray(tab.conditions)];
+      const conditions = [...asArray(tab[listKey])];
       conditions[conditionIndex] = condition;
-      return { ...tab, conditions };
+      return { ...tab, [listKey]: conditions };
     });
   }
 
-  _removeCondition(tabIndex, conditionIndex) {
+  _removeCondition(tabIndex, conditionIndex, listKey = "conditions", modeKey = "condition_mode") {
     this._updateTab(tabIndex, (tab) => {
-      const conditions = [...asArray(tab.conditions)];
+      const conditions = [...asArray(tab[listKey])];
       conditions.splice(conditionIndex, 1);
-      const result = { ...tab, conditions };
+      const result = { ...tab, [listKey]: conditions };
       if (!conditions.length) {
-        delete result.conditions;
-        delete result.condition_mode;
+        delete result[listKey];
+        delete result[modeKey];
+        if (listKey === "jump_conditions") delete result.jump_return;
       }
       return result;
     });
@@ -906,82 +1011,143 @@ export class HACardTabsEditor extends LitElement {
     };
   }
 
+  _options(name) {
+    const lists = {
+      tab_bar: [
+        ["show", "bar_show"],
+        ["auto", "bar_auto"],
+        ["hidden", "bar_hidden"],
+      ],
+      tab_position: [
+        ["top", "pos_top"],
+        ["bottom", "pos_bottom"],
+        ["left", "pos_left"],
+        ["right", "pos_right"],
+      ],
+      tab_style: [
+        ["underline", "style_underline"],
+        ["pills", "style_pills"],
+        ["buttons", "style_buttons"],
+        ["segmented", "style_segmented"],
+      ],
+      tab_alignment: [
+        ["start", "align_start"],
+        ["center", "align_center"],
+        ["end", "align_end"],
+        ["stretch", "align_stretch"],
+      ],
+      tab_content: [
+        ["icon_name", "content_icon_name"],
+        ["icon", "content_icon"],
+        ["name", "content_name"],
+      ],
+      icon_position: [
+        ["start", "icon_start"],
+        ["top", "icon_top"],
+      ],
+      tab_overflow: [
+        ["scroll", "overflow_scroll"],
+        ["arrows", "overflow_arrows"],
+        ["menu", "overflow_menu"],
+        ["wrap", "overflow_wrap"],
+      ],
+      animation: ANIMATIONS.map((name) => [name, `anim_${name}`]),
+      animation_easing: Object.keys(EASINGS).map((name) => [name, `easing_${name}`]),
+      sync_mode: [
+        ["both", "sync_both"],
+        ["read", "sync_read"],
+        ["write", "sync_write"],
+      ],
+    };
+    return lists[name];
+  }
+
+  _selectField(name, withDefault = false) {
+    const options = this._options(name).map(([value, key]) => ({ value, label: this._t(key) }));
+    if (withDefault) options.unshift({ value: "default", label: this._t("same_as_default") });
+    return { name, selector: { select: { mode: "dropdown", options } } };
+  }
+
+  _grid(...items) {
+    return { type: "grid", name: "", schema: items };
+  }
+
+  _numberField(name, min, max, unit, mode = "box") {
+    return { name, selector: { number: { min, max, mode, unit_of_measurement: unit } } };
+  }
+
   _renderAppearancePage() {
-    const schema = [
-      {
-        type: "grid",
-        name: "",
-        schema: [
-          this._select("tab_position", [
-            ["top", "pos_top"],
-            ["bottom", "pos_bottom"],
-            ["left", "pos_left"],
-            ["right", "pos_right"],
-          ]),
-          this._select("tab_style", [
-            ["underline", "style_underline"],
-            ["pills", "style_pills"],
-            ["buttons", "style_buttons"],
-            ["segmented", "style_segmented"],
-          ]),
-        ],
-      },
-      {
-        type: "grid",
-        name: "",
-        schema: [
-          this._select("tab_alignment", [
-            ["start", "align_start"],
-            ["center", "align_center"],
-            ["end", "align_end"],
-            ["stretch", "align_stretch"],
-          ]),
-          this._select("tab_content", [
-            ["icon_name", "content_icon_name"],
-            ["icon", "content_icon"],
-            ["name", "content_name"],
-          ]),
-        ],
-      },
-      {
-        type: "grid",
-        name: "",
-        schema: [
-          this._select("icon_position", [
-            ["start", "icon_start"],
-            ["top", "icon_top"],
-          ]),
-          this._select("animation", [
-            ["none", "anim_none"],
-            ["fade", "anim_fade"],
-            ["slide", "anim_slide"],
-          ]),
-        ],
-      },
-      { name: "card_gap", selector: { number: { min: 0, max: 48, mode: "slider", unit_of_measurement: "px" } } },
-      { name: "card_background", selector: { boolean: {} } },
-      { name: "inner_cards_background", selector: { boolean: {} } },
+    const config = this._config;
+    const data = { ...DEFAULTS, ...config };
+    const commit = (keys) => (values) => this._commit(applyValues(this._config, values, keys, DEFAULTS));
+
+    const bar = [
+      this._grid(this._selectField("tab_bar"), this._selectField("tab_position")),
+      ...(data.tab_bar === "auto" || config.mobile?.tab_bar === "auto"
+        ? [this._numberField("tab_bar_auto_hide", 1, 600, "s")]
+        : []),
+      this._grid(this._selectField("tab_style"), this._selectField("tab_alignment")),
+      this._grid(this._selectField("tab_content"), this._selectField("icon_position")),
+      this._selectField("tab_overflow"),
+      { name: "sliding_indicator", selector: { boolean: {} } },
       { name: "hide_single_tab", selector: { boolean: {} } },
     ];
-    const keys = schemaKeys(schema);
+    const animation = [
+      this._selectField("animation"),
+      this._grid(this._numberField("animation_duration", 50, 3000, "ms"), this._selectField("animation_easing")),
+    ];
+    const sizes = [
+      { name: "title", selector: { text: {} } },
+      this._grid(this._numberField("tab_font_size", 8, 40, "px"), this._numberField("tab_icon_size", 8, 64, "px")),
+      this._grid(this._numberField("tab_height", 20, 120, "px"), this._numberField("tab_spacing", 0, 48, "px")),
+      this._grid(this._numberField("tab_radius", 0, 999, "px"), this._numberField("content_padding", 0, 64, "px")),
+      this._grid(this._numberField("card_gap", 0, 64, "px"), this._numberField("content_height", 0, 4000, "px")),
+      { name: "card_background", selector: { boolean: {} } },
+      { name: "inner_cards_background", selector: { boolean: {} } },
+    ];
+    const mobile = [
+      this._numberField("mobile_breakpoint", 200, 2000, "px"),
+      ...MOBILE_KEYS.map((key) => this._selectField(key, true)),
+    ];
+    const mobileData = { mobile_breakpoint: data.mobile_breakpoint };
+    for (const key of MOBILE_KEYS) mobileData[key] = config.mobile?.[key] ?? "default";
+
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${{ ...DEFAULTS, ...this._config }}
-        .schema=${schema}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${(ev) => {
-          ev.stopPropagation();
-          this._commit(applyValues(this._config, ev.detail.value, keys, DEFAULTS));
-        }}
-      ></ha-form>
-      <h3>${this._t("global_colors")}</h3>
-      ${COLOR_KEYS.map((key) =>
-        this._renderColorField(key, this._config[key], (value) =>
-          this._commit(applyValues(this._config, { [key]: value }, [key])),
-        ),
+      ${this._panel("section_tab_bar", "mdi:tab", this._form(data, bar, commit(schemaKeys(bar))), true)}
+      ${this._panel(
+        "section_animation",
+        "mdi:animation-play-outline",
+        this._form(data, animation, commit(schemaKeys(animation))),
       )}
-      <div class="hint small">${this._t("color_helper")}</div>
+      ${this._panel("section_sizes", "mdi:ruler-square", this._form(data, sizes, commit(schemaKeys(sizes))))}
+      ${this._panel(
+        "section_mobile",
+        "mdi:cellphone",
+        html`<div class="hint small">${this._t("mobile_helper")}</div>
+          ${this._form(mobileData, mobile, (values) => {
+            const next = { ...this._config };
+            const overrides = {};
+            for (const key of MOBILE_KEYS) {
+              if (values[key] && values[key] !== "default") overrides[key] = values[key];
+            }
+            if (Object.keys(overrides).length) next.mobile = overrides;
+            else delete next.mobile;
+            this._commit(applyValues(next, values, ["mobile_breakpoint"], DEFAULTS));
+          })}`,
+        Boolean(config.mobile),
+      )}
+      ${this._panel(
+        "global_colors",
+        "mdi:palette-outline",
+        html`
+          ${COLOR_KEYS.map((key) =>
+            this._renderColorField(key, this._config[key], (value) =>
+              this._commit(applyValues(this._config, { [key]: value }, [key])),
+            ),
+          )}
+          <div class="hint small">${this._t("color_helper")}</div>
+        `,
+      )}
     `;
   }
 
@@ -994,28 +1160,22 @@ export class HACardTabsEditor extends LitElement {
         ? [{ name: "default_tab", selector: { select: { mode: "dropdown", options: tabOptions } } }]
         : []),
       { name: "remember_tab", selector: { boolean: {} } },
-      { name: "swipe", selector: { boolean: {} } },
-      {
-        name: "return_to_default",
-        selector: { number: { min: 0, max: 86400, mode: "box", unit_of_measurement: "s" } },
-      },
+      this._grid({ name: "swipe", selector: { boolean: {} } }, { name: "swipe_follow", selector: { boolean: {} } }),
+      this._numberField("return_to_default", 0, 86400, "s"),
     ];
     const keys = schemaKeys(schema);
+    const sync = [
+      { name: "sync_entity", selector: { entity: { domain: SYNC_DOMAINS } } },
+      ...(this._config.sync_entity ? [this._selectField("sync_mode")] : []),
+    ];
     const autoCycle = { ...AUTO_CYCLE_DEFAULTS, ...(this._config.auto_cycle || {}) };
     const cycleSchema = [{ name: "enabled", selector: { boolean: {} } }];
     if (autoCycle.enabled) {
       cycleSchema.push(
-        {
-          type: "grid",
-          name: "",
-          schema: [
-            { name: "interval", selector: { number: { min: 1, max: 86400, mode: "box", unit_of_measurement: "s" } } },
-            {
-              name: "pause_on_interaction",
-              selector: { number: { min: 0, max: 86400, mode: "box", unit_of_measurement: "s" } },
-            },
-          ],
-        },
+        this._grid(
+          this._numberField("interval", 1, 86400, "s"),
+          this._numberField("pause_on_interaction", 0, 86400, "s"),
+        ),
         { name: "pause_on_hover", selector: { boolean: {} } },
         { name: "show_progress", selector: { boolean: {} } },
       );
@@ -1025,33 +1185,45 @@ export class HACardTabsEditor extends LitElement {
     data.default_tab = String(Number(data.default_tab) || 0);
 
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${data}
-        .schema=${schema}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${(ev) => {
-          ev.stopPropagation();
-          const values = { ...ev.detail.value };
+      ${this._panel(
+        "section_general",
+        "mdi:cog-outline",
+        this._form(data, schema, (values) => {
           if (values.default_tab !== undefined) values.default_tab = Number(values.default_tab) || 0;
           this._commit(applyValues(this._config, values, keys, DEFAULTS));
-        }}
-      ></ha-form>
-      <h3>${this._t("auto_cycle")}</h3>
-      <ha-form
-        .hass=${this.hass}
-        .data=${autoCycle}
-        .schema=${cycleSchema}
-        .computeLabel=${(item) => this._t(item.name === "enabled" ? "auto_cycle_enabled" : item.name)}
-        @value-changed=${(ev) => {
-          ev.stopPropagation();
-          const next = applyValues(this._config.auto_cycle || {}, ev.detail.value, cycleKeys, AUTO_CYCLE_DEFAULTS);
-          const config = { ...this._config, auto_cycle: next };
-          if (!Object.keys(next).length) delete config.auto_cycle;
-          this._commit(config);
-        }}
-      ></ha-form>
-      <div class="hint small">${this._t("auto_cycle_helper")}</div>
+        }),
+        true,
+      )}
+      ${this._panel(
+        "auto_cycle",
+        "mdi:autorenew",
+        html`
+          ${this._form(
+            autoCycle,
+            cycleSchema,
+            (values) => {
+              const next = applyValues(this._config.auto_cycle || {}, values, cycleKeys, AUTO_CYCLE_DEFAULTS);
+              const config = { ...this._config, auto_cycle: next };
+              if (!Object.keys(next).length) delete config.auto_cycle;
+              this._commit(config);
+            },
+            (item) => this._t(item.name === "enabled" ? "auto_cycle_enabled" : item.name),
+          )}
+          <div class="hint small">${this._t("auto_cycle_helper")}</div>
+        `,
+        Boolean(autoCycle.enabled),
+      )}
+      ${this._panel(
+        "section_sync",
+        "mdi:sync",
+        html`
+          <div class="hint small">${this._t("sync_helper")}</div>
+          ${this._form(data, sync, (values) =>
+            this._commit(applyValues(this._config, values, schemaKeys(sync), DEFAULTS)),
+          )}
+        `,
+        Boolean(this._config.sync_entity),
+      )}
     `;
   }
 
@@ -1318,6 +1490,48 @@ export class HACardTabsEditor extends LitElement {
     }
     ha-form {
       display: block;
+    }
+    .panel {
+      margin: 12px 0 0;
+      border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+      border-radius: var(--hct-radius);
+      overflow: hidden;
+    }
+    .panel > summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: 500;
+      user-select: none;
+    }
+    .panel > summary::-webkit-details-marker {
+      display: none;
+    }
+    .panel > summary span {
+      flex: 1 1 auto;
+    }
+    .panel > summary ha-icon {
+      --mdc-icon-size: 20px;
+      color: var(--secondary-text-color);
+    }
+    .panel > summary .chevron {
+      transition: transform 0.2s ease;
+    }
+    .panel[open] > summary .chevron {
+      transform: rotate(180deg);
+    }
+    .panel[open] > summary {
+      border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+    }
+    .panel-body {
+      padding: 12px;
+    }
+    .chip.disabled span {
+      text-decoration: line-through;
+      opacity: 0.7;
     }
   `;
 }

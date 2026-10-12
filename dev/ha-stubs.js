@@ -93,14 +93,22 @@
     class extends HTMLElement {
       set data(v) {
         this._data = v;
-        this.render();
+        this.scheduleRender();
       }
       get data() {
         return this._data;
       }
       set schema(v) {
         this._schema = v;
-        this.render();
+        this.scheduleRender();
+      }
+      scheduleRender() {
+        if (this._queued) return;
+        this._queued = true;
+        queueMicrotask(() => {
+          this._queued = false;
+          this.render();
+        });
       }
       get schema() {
         return this._schema;
@@ -163,6 +171,12 @@
             }
             input.value = value ?? "";
             input.addEventListener("change", () => this.emit(item.name, input.value));
+          } else if ("ui_action" in sel) {
+            input = document.createElement("textarea");
+            input.value = value ? JSON.stringify(value) : "";
+            input.addEventListener("change", () =>
+              this.emit(item.name, input.value ? JSON.parse(input.value) : undefined),
+            );
           } else {
             input = document.createElement("input");
             input.type = "text";
@@ -251,6 +265,12 @@
     user: { id: "u1", name: "Gabriel", is_admin: true },
     states: {
       "light.wohnzimmer": { entity_id: "light.wohnzimmer", state: "off", attributes: { brightness: 0 } },
+      "input_select.tab": {
+        entity_id: "input_select.tab",
+        state: "Wohnzimmer",
+        attributes: { options: ["Wohnzimmer", "Küche", "Nur wenn Licht an"] },
+      },
+      "binary_sensor.klingel": { entity_id: "binary_sensor.klingel", state: "off", attributes: {} },
       "sensor.temperatur": {
         entity_id: "sensor.temperatur",
         state: "21",
@@ -271,10 +291,27 @@
         : undefined,
     connection: {
       subscribeMessage(callback, msg) {
-        const result = /false/i.test(msg.template) ? false : true;
+        const match = /\{\{\s*(.*?)\s*\}\}/s.exec(msg.template);
+        let result = true;
+        if (match) {
+          const expr = match[1];
+          if (/^false$/i.test(expr)) result = false;
+          else if (/^-?\d+(\.\d+)?$/.test(expr)) result = Number(expr);
+          else if (/^['"].*['"]$/.test(expr)) result = expr.slice(1, -1);
+        }
         setTimeout(() => callback({ result }), 10);
         return Promise.resolve(() => {});
       },
+    },
+    callService(domain, service, data) {
+      window.__serviceCalls = window.__serviceCalls || [];
+      window.__serviceCalls.push({ domain, service, data });
+      if (window.__update && service === "select_option") {
+        window.__update((states) => {
+          states[data.entity_id] = { ...states[data.entity_id], state: data.option };
+        });
+      }
+      return Promise.resolve();
     },
   });
 

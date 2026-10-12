@@ -1,6 +1,6 @@
 {
   "name": "hacardtabs",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Home Assistant Lovelace card with configurable tabs – every tab is a section that holds other cards.",
   "type": "module",
   "main": "dist/hacardtabs.js",

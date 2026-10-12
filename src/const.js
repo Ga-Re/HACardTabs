@@ -1,4 +1,4 @@
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 export const CARD_TYPE = "hacard-tabs";
 export const EDITOR_TYPE = "hacard-tabs-editor";
@@ -9,19 +9,42 @@ export const EDITOR_SELECT_EVENT = "hacard-tabs-editor-select";
 export const DEFAULTS = {
   default_tab: 0,
   remember_tab: false,
+  tab_bar: "show",
+  tab_bar_auto_hide: 4,
   tab_position: "top",
   tab_style: "underline",
   tab_alignment: "start",
   tab_content: "icon_name",
   icon_position: "start",
+  tab_overflow: "scroll",
+  sliding_indicator: true,
   card_background: true,
   inner_cards_background: true,
   hide_single_tab: false,
   animation: "fade",
+  animation_duration: 300,
+  animation_easing: "ease",
   swipe: true,
+  swipe_follow: true,
   card_gap: 8,
   return_to_default: 0,
+  sync_mode: "both",
+  mobile_breakpoint: 600,
 };
+
+/** Options that can be overridden for narrow cards (`mobile:`). */
+export const MOBILE_KEYS = [
+  "tab_bar",
+  "tab_position",
+  "tab_style",
+  "tab_alignment",
+  "tab_content",
+  "icon_position",
+  "animation",
+];
+
+/** Domains that can be used for `sync_entity`. */
+export const SYNC_DOMAINS = ["input_select", "select", "input_text", "input_number", "number"];
 
 export const AUTO_CYCLE_DEFAULTS = {
   enabled: false,

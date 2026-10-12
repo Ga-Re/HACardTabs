@@ -8,9 +8,26 @@ export const cardStyles = css`
     display: none !important;
   }
   ha-card {
+    position: relative;
     height: 100%;
     overflow: hidden;
     box-sizing: border-box;
+  }
+  ha-card.menu-open {
+    overflow: visible;
+    z-index: 2;
+  }
+  .title {
+    padding: 12px 16px 4px;
+    font-family: var(--ha-card-header-font-family, inherit);
+    font-size: var(--ha-card-header-font-size, 20px);
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ha-card-header-color, var(--primary-text-color));
+  }
+  .no-bg .title {
+    padding-left: 0;
+    padding-right: 0;
   }
   ha-card.no-bg {
     background: none;
@@ -35,16 +52,101 @@ export const cardStyles = css`
   }
 
   /* ---------- tab bar ---------- */
-  .tabbar {
+  .bar-wrap {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-rows: 1fr;
+    min-width: 0;
+    transition:
+      grid-template-rows 0.3s ease,
+      grid-template-columns 0.3s ease,
+      opacity 0.3s ease;
+  }
+  .bar-wrap.vertical {
+    grid-template-rows: none;
+    grid-template-columns: 1fr;
+    max-width: 40%;
+  }
+  .bar-wrap.collapsed {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .bar-wrap.vertical.collapsed {
+    grid-template-columns: 0fr;
+  }
+  .bar-wrap.edit-only {
+    opacity: 0.55;
+  }
+  .bar-inner {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .bar-row {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    min-width: 0;
+  }
+  .bar-wrap.vertical .bar-row {
+    flex-direction: column;
+    align-items: stretch;
+    height: 100%;
+  }
+  .bar-btn {
+    all: unset;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--secondary-text-color);
+  }
+  .bar-btn:hover:not([disabled]) {
+    background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.06);
+  }
+  .bar-btn[disabled] {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .bar-btn ha-icon {
+    --mdc-icon-size: 22px;
+  }
+  .bar-handle {
+    all: unset;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 44px;
+    height: 5px;
+    margin: 6px auto;
+    border-radius: 3px;
+    background: var(--divider-color, rgba(0, 0, 0, 0.2));
+    cursor: pointer;
+  }
+  .pos-left .bar-handle,
+  .pos-right .bar-handle {
+    width: 5px;
+    height: 44px;
+    margin: auto 6px;
+  }
+  .tabbar {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    gap: var(--hct-tab-gap, 4px);
     padding: 6px 8px 0;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
-    flex: 0 0 auto;
     box-sizing: border-box;
     min-width: 0;
+  }
+  .tabbar.wrap {
+    flex-wrap: wrap;
+    overflow: visible;
   }
   .tabbar::-webkit-scrollbar {
     display: none;
@@ -61,7 +163,6 @@ export const cardStyles = css`
     overflow-x: hidden;
     overflow-y: auto;
     padding: 8px 0 8px 8px;
-    max-width: 40%;
   }
   .pos-right .tabbar.vertical {
     padding: 8px 8px 8px 0;
@@ -92,8 +193,8 @@ export const cardStyles = css`
   .tabbar.style-segmented {
     margin: 8px 8px 0;
     padding: 4px;
-    gap: 2px;
-    border-radius: 12px;
+    gap: var(--hct-tab-gap, 2px);
+    border-radius: calc(var(--hct-radius, 9px) + 3px);
     background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.06);
   }
   .no-bg .tabbar.style-segmented {
@@ -120,19 +221,20 @@ export const cardStyles = css`
     flex: 0 0 auto;
     align-items: center;
     gap: 6px;
-    min-height: 40px;
+    z-index: 1;
+    min-height: var(--hct-tab-height, 40px);
     padding: 8px 14px;
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
     font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, inherit));
-    font-size: var(--hacard-tabs-font-size, 14px);
+    font-size: var(--hct-font-size, var(--hacard-tabs-font-size, 14px));
     font-weight: 500;
     line-height: 1.2;
     color: var(--hct-text, var(--secondary-text-color));
     background: var(--hct-bg, transparent);
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--hct-radius, 8px) var(--hct-radius, 8px) 0 0;
     transition:
       color 0.2s ease,
       background-color 0.2s ease,
@@ -146,14 +248,14 @@ export const cardStyles = css`
     outline-offset: -2px;
   }
   .tab ha-icon {
-    --mdc-icon-size: var(--hacard-tabs-icon-size, 20px);
+    --mdc-icon-size: var(--hct-icon-size, var(--hacard-tabs-icon-size, 20px));
     flex: 0 0 auto;
   }
   .tab.icon-top {
     flex-direction: column;
     gap: 2px;
     padding: 6px 12px;
-    font-size: var(--hacard-tabs-font-size, 12px);
+    font-size: var(--hct-font-size, var(--hacard-tabs-font-size, 12px));
   }
   .tab .label {
     overflow: hidden;
@@ -168,7 +270,18 @@ export const cardStyles = css`
     font-weight: 600;
     text-align: center;
     color: var(--text-primary-color, #fff);
-    background: var(--_color);
+    background: var(--hct-badge, var(--_color));
+  }
+  .badge.dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 0;
+    width: 9px;
+    height: 9px;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--card-background-color, #fff);
   }
   .tab.icon-top .badge {
     position: absolute;
@@ -185,13 +298,13 @@ export const cardStyles = css`
     outline-offset: -3px;
   }
   .vertical .tab {
-    border-radius: 8px 0 0 8px;
+    border-radius: var(--hct-radius, 8px) 0 0 var(--hct-radius, 8px);
   }
   .pos-right .vertical .tab {
-    border-radius: 0 8px 8px 0;
+    border-radius: 0 var(--hct-radius, 8px) var(--hct-radius, 8px) 0;
   }
   .pos-bottom .tab {
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--hct-radius, 8px) var(--hct-radius, 8px);
   }
 
   /* underline */
@@ -239,7 +352,7 @@ export const cardStyles = css`
 
   /* pills / buttons / segmented */
   .style-pills .tab {
-    border-radius: 999px;
+    border-radius: var(--hct-radius, 999px);
   }
   .style-pills,
   .style-buttons {
@@ -250,12 +363,12 @@ export const cardStyles = css`
     padding-top: 6px;
   }
   .style-buttons .tab {
-    border-radius: 12px;
+    border-radius: var(--hct-radius, 12px);
     background: var(--hct-bg, rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.06));
   }
   .style-segmented .tab {
-    border-radius: 9px;
-    min-height: 34px;
+    border-radius: var(--hct-radius, 9px);
+    min-height: var(--hct-tab-height, 34px);
   }
   .style-pills .tab.active,
   .style-buttons .tab.active,
@@ -263,11 +376,147 @@ export const cardStyles = css`
     background: var(--_color);
     color: var(--hct-active-text, var(--text-primary-color, #fff));
   }
-  .style-pills .tab.active .badge,
-  .style-buttons .tab.active .badge,
-  .style-segmented .tab.active .badge {
+  .style-pills .tab.active .badge:not(.dot),
+  .style-buttons .tab.active .badge:not(.dot),
+  .style-segmented .tab.active .badge:not(.dot) {
     background: var(--card-background-color, #fff);
     color: var(--_color);
+  }
+
+  /* sliding indicator */
+  .indicator {
+    --_color: var(--hct-color, var(--primary-color));
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      left var(--hct-anim-duration, 300ms) var(--hct-anim-easing, ease),
+      top var(--hct-anim-duration, 300ms) var(--hct-anim-easing, ease),
+      width var(--hct-anim-duration, 300ms) var(--hct-anim-easing, ease),
+      height var(--hct-anim-duration, 300ms) var(--hct-anim-easing, ease),
+      opacity 0.2s ease;
+  }
+  .indicator.instant {
+    transition: none;
+  }
+  .indicator::after {
+    content: "";
+    position: absolute;
+    background: var(--_color);
+    border-radius: inherit;
+    transition: background-color 0.3s ease;
+  }
+  .style-underline .indicator::after {
+    left: 10px;
+    right: 10px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
+  .pos-bottom .style-underline .indicator::after {
+    bottom: auto;
+    top: 0;
+    border-radius: 0 0 3px 3px;
+  }
+  .vertical.style-underline .indicator::after {
+    left: auto;
+    right: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    height: auto;
+    border-radius: 3px 0 0 3px;
+  }
+  .pos-right .vertical.style-underline .indicator::after {
+    right: auto;
+    left: 0;
+    border-radius: 0 3px 3px 0;
+  }
+  .style-pills .indicator {
+    border-radius: var(--hct-radius, 999px);
+  }
+  .style-buttons .indicator {
+    border-radius: var(--hct-radius, 12px);
+  }
+  .style-segmented .indicator {
+    border-radius: var(--hct-radius, 9px);
+  }
+  .style-pills .indicator::after,
+  .style-buttons .indicator::after,
+  .style-segmented .indicator::after {
+    inset: 0;
+  }
+  .tabbar.sliding .tab::after {
+    display: none;
+  }
+  .tabbar.sliding.style-pills .tab.active,
+  .tabbar.sliding.style-buttons .tab.active,
+  .tabbar.sliding.style-segmented .tab.active {
+    background: transparent;
+  }
+
+  /* overflow menu */
+  .menu {
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 180px;
+    max-width: 280px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 6px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: var(--card-background-color, #fff);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  }
+  .menu-item {
+    --_color: var(--hct-color, var(--primary-color));
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--primary-text-color);
+  }
+  .menu-item:hover {
+    background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.06);
+  }
+  .menu-item.active {
+    color: var(--_color);
+    font-weight: 500;
+  }
+  .menu-item ha-icon {
+    --mdc-icon-size: 20px;
+    color: var(--_color);
+  }
+  .menu-item .spacer {
+    width: 20px;
+  }
+  .menu-item .label {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .menu-item .badge {
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary-color, #fff);
+    background: var(--hct-badge, var(--_color));
   }
 
   /* ---------- body ---------- */
@@ -307,21 +556,48 @@ export const cardStyles = css`
     }
   }
   .content {
-    padding: var(--hacard-tabs-padding, 8px);
+    padding: var(--hct-padding, var(--hacard-tabs-padding, 8px));
     min-width: 0;
     flex: 1 1 auto;
+    box-sizing: border-box;
+  }
+  .content.fixed-height {
+    overflow-y: auto;
   }
   .no-bg .content {
-    padding: var(--hacard-tabs-padding, 8px 0 0 0);
+    padding: var(--hct-padding, var(--hacard-tabs-padding, 8px 0 0 0));
   }
   .no-bg.bar-bottom .content {
-    padding: var(--hacard-tabs-padding, 0 0 8px 0);
+    padding: var(--hct-padding, var(--hacard-tabs-padding, 0 0 8px 0));
   }
   .no-bg.bar-left .content {
-    padding: var(--hacard-tabs-padding, 0 0 0 8px);
+    padding: var(--hct-padding, var(--hacard-tabs-padding, 0 0 0 8px));
   }
   .no-bg.bar-right .content {
-    padding: var(--hacard-tabs-padding, 0 8px 0 0);
+    padding: var(--hct-padding, var(--hacard-tabs-padding, 0 8px 0 0));
+  }
+  .viewport {
+    position: relative;
+  }
+  .viewport.animating,
+  .viewport.dragging {
+    overflow: hidden;
+  }
+  .viewport > .leaving,
+  .viewport > .drag-neighbor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .viewport > .leaving {
+    pointer-events: none;
+  }
+  .viewport.animating > .section {
+    backface-visibility: hidden;
+  }
+  .viewport.dragging > .section {
+    will-change: transform;
   }
   .section {
     display: grid;
@@ -347,47 +623,11 @@ export const cardStyles = css`
     border: 1px dashed var(--divider-color, rgba(0, 0, 0, 0.2));
     border-radius: 8px;
   }
-  .section.anim-fade {
-    animation: hct-fade 0.25s ease;
-  }
-  .section.anim-slide-next {
-    animation: hct-slide-next 0.25s ease;
-  }
-  .section.anim-slide-prev {
-    animation: hct-slide-prev 0.25s ease;
-  }
-  @keyframes hct-fade {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  @keyframes hct-slide-next {
-    from {
-      opacity: 0;
-      transform: translateX(24px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes hct-slide-prev {
-    from {
-      opacity: 0;
-      transform: translateX(-24px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .section,
     .tab,
-    .tab::after {
+    .tab::after,
+    .indicator,
+    .bar-wrap {
       animation: none !important;
       transition: none !important;
     }
