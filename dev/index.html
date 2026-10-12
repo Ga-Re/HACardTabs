@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Card Tabs – Dev</title>
+    <style>
+      :root {
+        --primary-color: #03a9f4;
+        --accent-color: #ff9800;
+        --rgb-primary-color: 3, 169, 244;
+        --primary-text-color: #212121;
+        --rgb-primary-text-color: 33, 33, 33;
+        --secondary-text-color: #727272;
+        --text-primary-color: #fff;
+        --divider-color: rgba(0, 0, 0, 0.12);
+        --card-background-color: #fff;
+        --error-color: #db4437;
+        --red-color: #f44336;
+        --green-color: #4caf50;
+        --orange-color: #ff9800;
+        --purple-color: #9c27b0;
+        --teal-color: #009688;
+        font-family: Roboto, Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #f0f2f5;
+        color: var(--primary-text-color);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 200px;
+        font-family: monospace;
+        box-sizing: border-box;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 8px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Card Tabs – Entwicklungsumgebung (simuliertes Home Assistant)</h2>
+    <div class="controls">
+      <button id="toggle-light">light.wohnzimmer umschalten</button>
+      <button id="temp-up">Temperatur +5</button>
+      <button id="edit-mode">Bearbeitungsmodus umschalten</button>
+    </div>
+    <div class="layout">
+      <div>
+        <div id="card-host"></div>
+      </div>
+      <div class="panel">
+        <div id="editor-host"></div>
+        <h4>Konfiguration (JSON)</h4>
+        <textarea id="config-out"></textarea>
+      </div>
+    </div>
+
+    <script type="module">
+      // Real Material Design Icons for the stubbed <ha-icon> (dev only, not part of the card bundle)
+      import * as MDI from "../node_modules/@mdi/js/mdi.js";
+      window.MDI = MDI;
+      document.querySelectorAll("ha-icon").forEach((icon) => icon.render?.());
+    </script>
+    <script src="./ha-stubs.js"></script>
+    <script type="module">
+      import "../dist/hacardtabs.js";
+
+      const config = {
+        type: "custom:hacard-tabs",
+        tab_style: "underline",
+        auto_cycle: { enabled: false, interval: 5 },
+        tabs: [
+          {
+            name: "Wohnzimmer",
+            icon: "mdi:sofa",
+            color: "orange",
+            badge_entity: "sensor.temperatur",
+            cards: [
+              { type: "markdown", content: "## Wohnzimmer\nHallo aus Tab 1" },
+              { type: "entity", entity: "light.wohnzimmer" },
+            ],
+          },
+          {
+            name: "Küche",
+            icon: "mdi:silverware-fork-knife",
+            color: "#4caf50",
+            columns: 2,
+            cards: [
+              { type: "markdown", content: "Karte A" },
+              { type: "markdown", content: "Karte B" },
+            ],
+          },
+          {
+            name: "Nur wenn Licht an",
+            icon: "mdi:lightbulb",
+            conditions: [{ condition: "state", entity: "light.wohnzimmer", state: "on" }],
+            cards: [{ type: "markdown", content: "Das Licht ist an!" }],
+          },
+        ],
+      };
+
+      const hass = window.createMockHass();
+      const card = document.createElement("hacard-tabs");
+      card.setConfig(config);
+      card.hass = hass;
+      document.getElementById("card-host").appendChild(card);
+
+      const editor = document.createElement("hacard-tabs-editor");
+      editor.hass = hass;
+      editor.lovelace = {};
+      editor.setConfig(config);
+      document.getElementById("editor-host").appendChild(editor);
+      const out = document.getElementById("config-out");
+      out.value = JSON.stringify(config, null, 2);
+
+      editor.addEventListener("config-changed", (ev) => {
+        const newConfig = ev.detail.config;
+        out.value = JSON.stringify(newConfig, null, 2);
+        editor.setConfig(newConfig);
+        card.setConfig(newConfig);
+      });
+      out.addEventListener("change", () => {
+        try {
+          const newConfig = JSON.parse(out.value);
+          editor.setConfig(newConfig);
+          card.setConfig(newConfig);
+        } catch (err) {
+          alert(err);
+        }
+      });
+
+      window.__card = card;
+      window.__editor = editor;
+      window.__hass = hass;
+
+      const update = (fn) => {
+        const next = window.updateMockHass(window.__hass, fn);
+        window.__hass = next;
+        card.hass = next;
+        editor.hass = next;
+      };
+      window.__update = update;
+      document.getElementById("toggle-light").onclick = () =>
+        update((states) => {
+          states["light.wohnzimmer"] = {
+            ...states["light.wohnzimmer"],
+            state: states["light.wohnzimmer"].state === "on" ? "off" : "on",
+          };
+        });
+      document.getElementById("temp-up").onclick = () =>
+        update((states) => {
+          const s = states["sensor.temperatur"];
+          states["sensor.temperatur"] = { ...s, state: String(Number(s.state) + 5) };
+        });
+      document.getElementById("edit-mode").onclick = () => {
+        card.editMode = !card.editMode;
+      };
+    </script>
+  </body>
+</html>
