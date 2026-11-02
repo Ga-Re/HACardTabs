@@ -384,6 +384,56 @@ export const cardStyles = css`
   .dur:hover {
     border-color: var(--primary-color);
   }
+  .dur.custom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    --mdc-icon-size: 16px;
+  }
+  .dur.custom-chip.open:not(.selected) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+  .custom {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: var(--rm-radius);
+    background: var(--rm-chip-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .custom-modes {
+    display: flex;
+    gap: 6px;
+  }
+  .custom-modes .dur {
+    transition: none;
+    min-width: 64px;
+  }
+  .custom-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .custom .field .input {
+    background: var(--card-background-color, #fff);
+  }
+  .custom input[type="datetime-local"] {
+    padding: 6px 8px;
+    font-size: 1em;
+    min-height: 22px;
+    color-scheme: light dark;
+  }
+  .custom-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .custom-actions .note {
+    padding: 0;
+  }
   .dur.selected {
     background: var(--primary-color);
     border-color: var(--primary-color);
@@ -542,7 +592,7 @@ export const cardStyles = css`
     height: 20px;
     flex: none;
     border-radius: 10px;
-    background: var(--switch-unchecked-track-color, rgba(0, 0, 0, 0.26));
+    background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.26);
     transition: background 0.2s;
   }
   .switch::after {
@@ -553,16 +603,15 @@ export const cardStyles = css`
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: var(--switch-unchecked-button-color, #fafafa);
+    background: #fff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     transition: transform 0.2s;
   }
   .switch.on {
-    background: var(--switch-checked-track-color, var(--primary-color));
+    background: var(--primary-color);
   }
   .switch.on::after {
     transform: translateX(16px);
-    background: var(--switch-checked-button-color, #fff);
   }
 
   /* Info ---------------------------------------------------------------- */

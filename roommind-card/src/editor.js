@@ -6,7 +6,6 @@ import { ALL_DURATIONS, DEFAULTS, EDITOR_TYPE, durationLabel, fireEvent, normali
 const SECTION_KEYS = [
   "show_status",
   "show_target",
-  "show_duration",
   "show_presets",
   "show_modes",
   "show_windows",
@@ -36,28 +35,54 @@ async function ensureHaForm() {
 }
 
 const durationValue = (d) => String(d);
+const sortDurations = (list) => {
+  const numbers = [...new Set(list.filter((d) => typeof d === "number"))].sort((a, b) => a - b);
+  return [
+    ...(list.includes("schedule") ? ["schedule"] : []),
+    ...numbers,
+    ...(list.includes("permanent") ? ["permanent"] : []),
+  ];
+};
+
+/** Parses "5; 10; 1,5" (comma as decimal separator between digits) into hours. */
+export function parseExtraDurations(text) {
+  return String(text || "")
+    .replace(/(\d),(\d)/g, "$1.$2")
+    .split(/[;,\s]+/)
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= 999)
+    .map((n) => Math.round(n * 1000) / 1000);
+}
 
 export class RoomMindCardEditor extends LitElement {
   static properties = {
     hass: { attribute: false },
     _config: { state: true },
     _ready: { state: true },
+    _rooms: { state: true },
   };
 
   static styles = css`
     .group {
-      margin-top: 16px;
+      margin-top: 20px;
     }
     .group-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-weight: 500;
       margin: 0 0 8px;
       color: var(--primary-text-color);
+      --mdc-icon-size: 20px;
     }
-    .version {
-      margin-top: 12px;
-      font-size: 0.8em;
+    .group-title ha-icon {
       color: var(--secondary-text-color);
-      text-align: right;
+    }
+    .hint {
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+      margin: -4px 0 8px;
     }
   `;
 
@@ -70,13 +95,43 @@ export class RoomMindCardEditor extends LitElement {
 
   setConfig(config) {
     this._config = config;
+    // Keep what the user is typing unless the config was changed elsewhere (e.g. in YAML)
+    if (this._extraText !== undefined) {
+      const typed = parseExtraDurations(this._extraText).filter((d) => !ALL_DURATIONS.includes(d));
+      if (JSON.stringify(sortDurations(typed)) !== JSON.stringify(this._extraDurations())) this._extraText = undefined;
+    }
   }
 
-  _t(key) {
-    return localize(this.hass, `editor.${key}`);
+  updated(changed) {
+    if (changed.has("hass") && this.hass && this._rooms === undefined) {
+      this._rooms = null;
+      this.hass
+        .callWS({ type: "roommind/rooms/list" })
+        .then((res) => {
+          this._rooms = res?.rooms || {};
+        })
+        .catch(() => {
+          this._rooms = {};
+        });
+    }
   }
 
-  get _mainSchema() {
+  _t(key, vars) {
+    return localize(this.hass, `editor.${key}`, vars);
+  }
+
+  _durations() {
+    const list = this._config?.durations ?? DEFAULTS.durations;
+    return list.map(normalizeDuration).filter((d) => d !== undefined);
+  }
+
+  _extraDurations() {
+    return this._durations().filter((d) => typeof d === "number" && !ALL_DURATIONS.includes(d));
+  }
+
+  // --- Schemas ----------------------------------------------------------------------------
+
+  get _roomSchema() {
     return [
       {
         name: "entity",
@@ -96,20 +151,22 @@ export class RoomMindCardEditor extends LitElement {
 
   get _durationSchema() {
     const options = ALL_DURATIONS.map((d) => ({ value: durationValue(d), label: durationLabel(this.hass, d) }));
-    const chosen = this._durations().map(durationValue);
+    const chosen = this._durations();
+    const defaultOptions = chosen.map((d) => ({ value: durationValue(d), label: durationLabel(this.hass, d) }));
     return [
+      { name: "show_duration", selector: { boolean: {} } },
       {
         name: "durations",
-        selector: { select: { multiple: true, mode: "list", options } },
+        selector: { select: { multiple: true, mode: "dropdown", options } },
       },
+      { name: "extra_durations", selector: { text: {} } },
       {
-        name: "default_duration",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: options.filter((o) => chosen.includes(o.value)),
-          },
-        },
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "default_duration", selector: { select: { mode: "dropdown", options: defaultOptions } } },
+          { name: "show_custom_duration", selector: { boolean: {} } },
+        ],
       },
     ];
   }
@@ -126,50 +183,96 @@ export class RoomMindCardEditor extends LitElement {
   }
 
   get _advancedSchema() {
+    const rooms = this._rooms || {};
+    const roomOptions = Object.entries(rooms).map(([id, room]) => ({
+      value: id,
+      label: room.display_name ? `${room.display_name} (${id})` : id,
+    }));
     return [
       {
         type: "grid",
         name: "",
         schema: [
           { name: "compact", selector: { boolean: {} } },
-          { name: "apply_delay", selector: { number: { min: 300, max: 5000, step: 100, mode: "box", unit_of_measurement: "ms" } } },
+          {
+            name: "apply_delay",
+            selector: { number: { min: 300, max: 5000, step: 100, mode: "box", unit_of_measurement: "ms" } },
+          },
         ],
       },
-      { name: "area_id", selector: { text: {} } },
+      roomOptions.length
+        ? {
+            name: "area_id",
+            selector: { select: { mode: "dropdown", custom_value: true, options: roomOptions } },
+          }
+        : { name: "area_id", selector: { text: {} } },
+      {
+        name: "vacation_entity",
+        selector: { entity: { domain: "switch" } },
+      },
     ];
   }
 
-  _durations() {
-    const list = this._config?.durations ?? DEFAULTS.durations;
-    return list.map(normalizeDuration).filter((d) => d !== undefined);
-  }
+  // --- Labels -----------------------------------------------------------------------------
 
   _computeLabel = (schema) => this._t(schema.name) || schema.name;
+
+  _computeHelper = (schema) => {
+    const key = `helper_${schema.name}`;
+    const text = this._t(key);
+    return text === `editor.${key}` ? undefined : text;
+  };
+
+  // --- Data -------------------------------------------------------------------------------
 
   _data() {
     const c = { ...DEFAULTS, ...this._config };
     return {
       ...c,
-      durations: this._durations().map(durationValue),
+      durations: this._durations()
+        .filter((d) => ALL_DURATIONS.includes(d))
+        .map(durationValue),
+      extra_durations:
+        this._extraText ??
+        this._extraDurations()
+          .map((n) => String(n).replace(".", localize(this.hass, "editor.decimal")))
+          .join("; "),
       default_duration: durationValue(normalizeDuration(c.default_duration) ?? "schedule"),
+      area_id: c.area_id || "",
+      vacation_entity: c.vacation_entity || "",
     };
+  }
+
+  /** Names of all fields in a schema (including nested grids). */
+  _names(schema) {
+    return schema.flatMap((item) => (item.schema ? this._names(item.schema) : [item.name]));
   }
 
   _changed(ev) {
     ev.stopPropagation();
     const value = { ...ev.detail.value };
     const config = { ...this._config };
+    let durations = this._durations();
+
+    if ("durations" in value) {
+      const set = new Set(value.durations || []);
+      durations = [...ALL_DURATIONS.filter((d) => set.has(durationValue(d))), ...this._extraDurations()];
+    }
+    if ("extra_durations" in value) {
+      this._extraText = value.extra_durations || "";
+      const extras = parseExtraDurations(value.extra_durations).filter((d) => !ALL_DURATIONS.includes(d));
+      durations = [...durations.filter((d) => ALL_DURATIONS.includes(d) || typeof d !== "number"), ...extras];
+    }
+    durations = sortDurations(durations);
+    if (JSON.stringify(durations) === JSON.stringify(DEFAULTS.durations)) delete config.durations;
+    else config.durations = durations;
+
     for (const [key, val] of Object.entries(value)) {
-      if (key === "durations") {
-        // Keep the natural order and store numbers as numbers
-        const set = new Set(val);
-        config.durations = ALL_DURATIONS.filter((d) => set.has(durationValue(d)));
-        continue;
-      }
+      if (key === "durations" || key === "extra_durations") continue;
       if (key === "default_duration") {
         const d = normalizeDuration(val);
-        if (d === "schedule") delete config.default_duration;
-        else if (d !== undefined) config.default_duration = d;
+        if (d === undefined || d === "schedule") delete config.default_duration;
+        else config.default_duration = d;
         continue;
       }
       if (val === "" || val === undefined || val === null) {
@@ -182,20 +285,12 @@ export class RoomMindCardEditor extends LitElement {
       }
       config[key] = val;
     }
-    if (config.durations && JSON.stringify(config.durations) === JSON.stringify(DEFAULTS.durations)) {
-      delete config.durations;
-    }
-    if (config.default_duration !== undefined) {
-      const list = config.durations ?? DEFAULTS.durations;
-      if (!list.includes(config.default_duration)) delete config.default_duration;
+    // The default duration must be one of the offered durations
+    if (config.default_duration !== undefined && !durations.includes(config.default_duration)) {
+      delete config.default_duration;
     }
     this._config = config;
     fireEvent(this, "config-changed", { config });
-  }
-
-  /** Names of all fields in a schema (including nested grids). */
-  _names(schema) {
-    return schema.flatMap((item) => (item.schema ? this._names(item.schema) : [item.name]));
   }
 
   _form(schema) {
@@ -207,26 +302,30 @@ export class RoomMindCardEditor extends LitElement {
       .data=${data}
       .schema=${schema}
       .computeLabel=${this._computeLabel}
+      .computeHelper=${this._computeHelper}
       @value-changed=${this._changed}
     ></ha-form>`;
+  }
+
+  _group(icon, title, content, hint) {
+    return html`<div class="group">
+      <div class="group-title"><ha-icon .icon=${icon}></ha-icon>${title}</div>
+      ${hint ? html`<div class="hint">${hint}</div>` : nothing} ${content}
+    </div>`;
   }
 
   render() {
     if (!this.hass || !this._config) return nothing;
     return html`
-      ${this._form(this._mainSchema)}
-      <div class="group">
-        <div class="group-title">${localize(this.hass, "duration.title")}</div>
-        ${this._form(this._durationSchema)}
-      </div>
-      <div class="group">
-        <div class="group-title">${this._t("sections")}</div>
-        ${this._form(this._sectionSchema)}
-      </div>
-      <div class="group">
-        <div class="group-title">${this._t("appearance")}</div>
-        ${this._form(this._advancedSchema)}
-      </div>
+      ${this._group("mdi:home-thermometer-outline", this._t("group_room"), this._form(this._roomSchema))}
+      ${this._group(
+        "mdi:timer-outline",
+        localize(this.hass, "duration.title"),
+        this._form(this._durationSchema),
+        this._t("hint_duration"),
+      )}
+      ${this._group("mdi:view-dashboard-outline", this._t("sections"), this._form(this._sectionSchema))}
+      ${this._group("mdi:cog-outline", this._t("appearance"), this._form(this._advancedSchema))}
     `;
   }
 }

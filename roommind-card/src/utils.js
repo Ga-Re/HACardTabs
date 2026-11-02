@@ -2,7 +2,7 @@ import { language, localize } from "./localize.js";
 
 export const CARD_TYPE = "roommind-card";
 export const EDITOR_TYPE = "roommind-card-editor";
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 /** Durations (hours) offered by default. "schedule" and "permanent" are special values. */
 export const DEFAULT_DURATIONS = ["schedule", 1, 2, 4, "permanent"];
@@ -14,6 +14,7 @@ export const DEFAULTS = {
   show_status: true,
   show_target: true,
   show_duration: true,
+  show_custom_duration: true,
   show_presets: true,
   show_modes: true,
   show_windows: true,
@@ -42,8 +43,36 @@ export function normalizeDuration(value) {
 export function durationLabel(hass, value) {
   if (value === "schedule") return localize(hass, "duration.schedule");
   if (value === "permanent") return localize(hass, "duration.permanent");
-  if (value < 1) return localize(hass, "duration.minutes", { n: Math.round(value * 60) });
-  return localize(hass, "duration.hours", { n: formatNumber(hass, value, 1) });
+  if (value && typeof value === "object" && value.until) {
+    return localize(hass, "duration.until", { time: formatUntil(hass, value.until) });
+  }
+  const totalMinutes = Math.round(Number(value) * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return localize(hass, "duration.minutes", { n: m });
+  if (m === 0) return localize(hass, "duration.hours", { n: h });
+  return localize(hass, "duration.hours_minutes", { h, m });
+}
+
+/**
+ * Hours an override should run for: a number of hours, or `{ until: epochSeconds }` for a fixed end.
+ * Returns undefined for "permanent" / "schedule".
+ */
+export function durationHours(value) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && value.until) {
+    return Math.round(((value.until - Date.now() / 1000) / 3600) * 1000) / 1000;
+  }
+  return undefined;
+}
+
+/** Value for <input type="datetime-local"> in local time. */
+export function toLocalInput(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
 
 // --- Temperatures -----------------------------------------------------------------------------

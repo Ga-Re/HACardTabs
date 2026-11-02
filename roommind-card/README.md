@@ -12,7 +12,9 @@ Rollo-Automatik und die Komfort-/Eco-Temperaturen des Raums.
 - **Zieltemperatur mit + / −.** Im Auto-Modus (Heizen & Kühlen) gibt es zwei Regler: „Heizen auf“ und „Kühlen ab“.
   Die Änderung wird nach einer kurzen Pause übernommen, damit mehrere Klicks nur einen Befehl senden.
 - **Laufzeit:** Wähle, wie lange eine geänderte Temperatur oder ein Preset gilt:
-  *Bis Zeitplan* (bis zum nächsten Wechsel im RoomMind-Zeitplan), feste Zeiten wie *1 h*, *2 h*, *4 h* oder *Dauerhaft*.
+  *Bis Zeitplan* (bis zum nächsten Wechsel im RoomMind-Zeitplan), feste Zeiten wie *1 h*, *2 h*, *4 h*, *Dauerhaft*
+  – oder **Eigene …**: dort gibst du eine beliebige Dauer (*Für* x Stunden y Minuten) oder einen
+  **Endzeitpunkt mit Datum und Uhrzeit** (*Bis* morgen 06:45) ein.
   Ist ein Override aktiv, siehst du die **Restlaufzeit und Endzeit**, kannst ihn **verlängern** (+1 h …),
   durch Tippen auf eine andere Laufzeit **neu setzen** oder **beenden**.
 - **Presets:** Zeitplan, Komfort, Eco und Halten (aktuelle Temperatur halten), jeweils mit der Raum-Temperatur.
@@ -25,7 +27,8 @@ Rollo-Automatik und die Komfort-/Eco-Temperaturen des Raums.
   nach manueller Verstellung wieder fortsetzen.
 - **Raum-Einstellungen** (aufklappbar): Komfort- und Eco-Temperatur (Heizen/Kühlen) sowie die Fenster-Verzögerungen
   direkt in der Karte ändern.
-- **Visueller Editor**, Deutsch und Englisch, helles und dunkles Theme, °C und °F.
+- **Komplett per GUI einstellbar:** Jede Option hat ein Feld im visuellen Editor, YAML ist nie nötig.
+- Deutsch und Englisch, helles und dunkles Theme, °C und °F.
 
 ## Installation
 
@@ -45,42 +48,47 @@ Ordners (`roommind-card/`) in dessen Wurzelverzeichnis. Danach:
    URL `/local/roommind-card.js`, Typ **JavaScript-Modul**.
 3. Browser neu laden (ggf. Cache leeren).
 
-## Konfiguration
+## Konfiguration (ohne YAML)
 
-Am einfachsten über den visuellen Editor: Karte hinzufügen → **RoomMind Card** → Raum auswählen.
+![Visueller Editor](docs/editor.png)
 
-Minimal in YAML:
+1. Dashboard bearbeiten → **Karte hinzufügen** → unter *Benutzerdefinierte Karten* **RoomMind Card** wählen.
+   Der erste RoomMind-Raum ist bereits ausgewählt.
+2. Im Editor einstellen:
+   - **Raum:** RoomMind-Raum (nur RoomMind-Klima-Entitäten werden angeboten), optional Name und Icon.
+   - **Laufzeit:** Auswahl ein-/ausblenden, welche Laufzeiten als Knöpfe erscheinen, **weitere eigene Laufzeiten**
+     in Stunden (z. B. `5; 10; 1,25`), Standard-Laufzeit und ob der Knopf **„Eigene …“** angezeigt wird.
+   - **Bereiche:** jeden Teil der Karte einzeln ein- oder ausblenden.
+   - **Darstellung & Erweitert:** Kompakt, Verzögerung bis zum Senden der Temperatur, RoomMind-Raum (falls die
+     automatische Erkennung nicht klappt) und ein umbenannter Urlaubs-Schalter.
+3. **Speichern** – fertig.
 
-```yaml
-type: custom:roommind-card
-entity: climate.roommind_arbeitszimmer
-```
+### Alle Optionen (zum Nachschlagen)
 
-Alle Optionen:
+Der Editor schreibt diese Einstellungen selbst; von Hand musst du nichts eintragen.
 
-```yaml
-type: custom:roommind-card
-entity: climate.roommind_arbeitszimmer   # RoomMind-Klima-Entität des Raums (Pflicht)
-name: Büro                               # eigener Name (optional)
-icon: mdi:desk                           # eigenes Icon (optional)
-durations: [schedule, 0.5, 1, 2, 4, permanent]  # Laufzeiten in Stunden, dazu "schedule" und "permanent"
-default_duration: schedule               # vorausgewählte Laufzeit
-show_status: true                        # Status-Chips
-show_target: true                        # Zieltemperatur
-show_duration: true                      # Laufzeit-Auswahl
-show_presets: true                       # Zeitplan / Komfort / Eco / Halten
-show_modes: true                         # Aus / Heizen / Kühlen / Auto
-show_windows: true                       # Fenster & Türen
-show_toggles: true                       # Urlaubsmodus, Rollo-Automatik
-show_climate_control: false              # zusätzlich Schalter „Klimasteuerung“
-show_info: true                          # Leistung, Gerätesollwert, Außentemperatur
-show_settings: true                      # Raum-Einstellungen (Komfort/Eco, Fenster-Verzögerung)
-settings_open: false                     # Raum-Einstellungen aufgeklappt anzeigen
-compact: false                           # kompaktere Darstellung
-apply_delay: 1200                        # ms nach dem letzten +/- bis zum Senden
-area_id: arbeitszimmer                   # RoomMind-Raum-ID, nur nötig wenn die Erkennung nicht klappt
-vacation_entity: switch.roommind_vacation  # nur nötig, wenn du den Urlaubs-Schalter umbenannt hast
-```
+| Option | Standard | Bedeutung |
+| --- | --- | --- |
+| `entity` | – | RoomMind-Klima-Entität des Raums |
+| `name`, `icon` | aus der Entität | eigener Name / eigenes Icon |
+| `durations` | `[schedule, 1, 2, 4, permanent]` | Laufzeit-Knöpfe in Stunden, dazu `schedule` und `permanent` |
+| `default_duration` | `schedule` | vorausgewählte Laufzeit |
+| `show_duration` | `true` | Laufzeit-Auswahl |
+| `show_custom_duration` | `true` | Knopf „Eigene …“ (Dauer oder Endzeitpunkt frei eingeben) |
+| `show_status` | `true` | Status-Chips |
+| `show_target` | `true` | Zieltemperatur |
+| `show_presets` | `true` | Zeitplan / Komfort / Eco / Halten |
+| `show_modes` | `true` | Aus / Heizen / Kühlen / Auto |
+| `show_windows` | `true` | Fenster & Türen |
+| `show_toggles` | `true` | Urlaubsmodus, Rollo-Automatik |
+| `show_climate_control` | `false` | zusätzlich Schalter „Klimasteuerung“ |
+| `show_info` | `true` | Leistung, Gerätesollwert, Außentemperatur |
+| `show_settings` | `true` | Raum-Einstellungen (Komfort/Eco, Fenster-Verzögerung) |
+| `settings_open` | `false` | Raum-Einstellungen aufgeklappt anzeigen |
+| `compact` | `false` | kompaktere Darstellung |
+| `apply_delay` | `1200` | ms nach dem letzten + / − bis zum Senden |
+| `area_id` | automatisch | RoomMind-Raum, falls die Erkennung nicht klappt |
+| `vacation_entity` | `switch.roommind_vacation` | nur nötig, wenn der Urlaubs-Schalter umbenannt wurde |
 
 ## So funktioniert die Steuerung
 
@@ -90,7 +98,7 @@ Die Karte nutzt die Entitäten von RoomMind und, wo diese nicht ausreichen, die 
 | Aktion in der Karte | Was passiert |
 | --- | --- |
 | Temperatur ändern, Laufzeit *Bis Zeitplan* | `climate.set_temperature` → Override bis zum nächsten Zeitplanwechsel |
-| Temperatur ändern, Laufzeit *1 h*, *Dauerhaft* … | `roommind/override/set` (Typ `custom`) mit `duration` |
+| Temperatur ändern, Laufzeit *1 h*, *Eigene …*, *Dauerhaft* | `roommind/override/set` (Typ `custom`) mit `duration` (ein Endzeitpunkt wird in Stunden ab jetzt umgerechnet) |
 | Komfort / Eco / Halten mit Laufzeit | `roommind/override/set` (Typ `boost` / `eco` / `custom`) |
 | Komfort / Eco / Halten, *Bis Zeitplan* | `climate.set_preset_mode` |
 | Zeitplan / Beenden | `roommind/override/clear` bzw. Preset `none` |

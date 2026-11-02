@@ -9,6 +9,7 @@ import {
   OVERRIDE_FOR_PRESET,
   PRESET_FOR_OVERRIDE,
   VERSION,
+  durationHours,
   durationLabel,
   fireEvent,
   formatNumber,
@@ -23,6 +24,7 @@ import {
   roundToStep,
   tempUnit,
   toCelsius,
+  toLocalInput,
   windowIcon,
 } from "./utils.js";
 import "./editor.js";
@@ -66,6 +68,12 @@ export class RoomMindCard extends LitElement {
     _draft: { state: true },
     _saved: { state: true },
     _now: { state: true },
+    _customOpen: { state: true },
+    _customMode: { state: true },
+    _customHours: { state: true },
+    _customMinutes: { state: true },
+    _customUntil: { state: true },
+    _customError: { state: true },
   };
 
   static styles = cardStyles;
@@ -125,6 +133,11 @@ export class RoomMindCard extends LitElement {
     }, POLL_INTERVAL);
     this._tick = setInterval(() => {
       if (this._overrideActive()) this._now = Date.now();
+      // A chosen end time that has passed falls back to the default duration
+      const d = this._duration;
+      if (d && typeof d === "object" && d.until && d.until <= Date.now() / 1000) {
+        this._duration = normalizeDuration(this._config.default_duration) ?? "schedule";
+      }
     }, 10000);
   }
 
@@ -258,7 +271,11 @@ export class RoomMindCard extends LitElement {
       if (heatC !== null && heatC !== undefined) msg.heat = Math.round(heatC * 100) / 100;
       if (coolC !== null && coolC !== undefined) msg.cool = Math.round(coolC * 100) / 100;
     }
-    if (typeof duration === "number" && duration > 0) msg.duration = duration;
+    const hours = durationHours(duration);
+    if (hours !== undefined) {
+      if (hours <= 0) throw new Error(localize(this.hass, "duration.in_past"));
+      msg.duration = hours;
+    }
     await this.hass.callWS(msg);
     this._scheduleFetch(300);
   }
@@ -722,6 +739,7 @@ export class RoomMindCard extends LitElement {
       sub = t("override.permanent");
     }
     const extendBy = typeof this._duration === "number" ? this._duration : 1;
+    const canExtend = Boolean(until && this._apiOk);
     return html`
       <div class="override active ${preset}">
         <ha-icon .icon=${PRESET_ICONS[preset] || "mdi:hand-back-right-outline"}></ha-icon>
@@ -730,7 +748,7 @@ export class RoomMindCard extends LitElement {
           <div class="sub">${sub}</div>
         </div>
         <div class="actions">
-          ${until && this._apiOk
+          ${canExtend
             ? html`<button class="small-btn" title=${t("override.extend")} @click=${() => this._extendOverride(extendBy)}>
                 +${durationLabel(this.hass, extendBy)}
               </button>`
@@ -741,12 +759,18 @@ export class RoomMindCard extends LitElement {
     `;
   }
 
+  _isCustomDuration(d = this._duration) {
+    return (d && typeof d === "object") || (typeof d === "number" && !this._durations.includes(d));
+  }
+
   _renderDurations() {
     const t = (key, vars) => localize(this.hass, key, vars);
     // Without the RoomMind API only "until schedule" can be set (through the climate entity)
-    const options = this._apiOk ? this._durations : this._durations.filter((d) => d === "schedule");
-    if (options.length < 2 && !this._apiOk) return nothing;
+    if (!this._apiOk) return nothing;
+    const options = this._durations;
     const active = this._overrideActive();
+    const showCustom = this._config.show_custom_duration !== false;
+    const custom = this._isCustomDuration();
     return html`
       <div>
         <div class="section-title">
@@ -757,11 +781,154 @@ export class RoomMindCard extends LitElement {
           ${options.map(
             (d) => html`<button
               class="dur ${this._duration === d ? "selected" : ""}"
-              @click=${() => this._selectDuration(d)}
+              @click=${() => {
+                this._customOpen = false;
+                this._selectDuration(d);
+              }}
             >
               ${durationLabel(this.hass, d)}
             </button>`,
           )}
+          ${showCustom
+            ? html`<button
+                class="dur custom-chip ${custom ? "selected" : ""} ${this._customOpen ? "open" : ""}"
+                @click=${() => this._toggleCustom()}
+              >
+                <ha-icon icon="mdi:pencil-outline"></ha-icon>
+                ${custom ? durationLabel(this.hass, this._duration) : t("duration.custom")}
+              </button>`
+            : nothing}
+        </div>
+        ${showCustom && this._customOpen ? this._renderCustomDuration(active) : nothing}
+      </div>
+    `;
+  }
+
+  _toggleCustom() {
+    this._customOpen = !this._customOpen;
+    if (!this._customOpen) return;
+    this._customError = undefined;
+    const d = this._duration;
+    if (d && typeof d === "object" && d.until) {
+      this._customMode = "until";
+      this._customUntil = toLocalInput(new Date(d.until * 1000));
+    } else {
+      const hours = typeof d === "number" ? d : 2;
+      this._customMode = this._customMode || "for";
+      this._customHours = Math.floor(hours);
+      this._customMinutes = Math.round((hours - Math.floor(hours)) * 60);
+    }
+    if (!this._customUntil) {
+      // Default end: in two hours, rounded up to the next quarter hour
+      const date = new Date(Date.now() + 2 * 3600 * 1000);
+      date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
+      this._customUntil = toLocalInput(date);
+    }
+  }
+
+  _customStep(key, delta) {
+    if (key === "hours") {
+      this._customHours = Math.max(0, Math.min(999, Number(this._customHours || 0) + delta));
+    } else {
+      let minutes = Number(this._customMinutes || 0) + delta;
+      let hours = Number(this._customHours || 0);
+      if (minutes >= 60) {
+        minutes -= 60;
+        hours += 1;
+      } else if (minutes < 0) {
+        if (hours > 0) {
+          minutes += 60;
+          hours -= 1;
+        } else {
+          minutes = 0;
+        }
+      }
+      this._customHours = hours;
+      this._customMinutes = minutes;
+    }
+    this._customError = undefined;
+  }
+
+  _applyCustom() {
+    let duration;
+    if (this._customMode === "until") {
+      const date = new Date(this._customUntil);
+      if (!this._customUntil || Number.isNaN(date.getTime()) || date.getTime() <= Date.now() + 30000) {
+        this._customError = localize(this.hass, "duration.in_past");
+        return undefined;
+      }
+      duration = { until: Math.floor(date.getTime() / 1000) };
+    } else {
+      const hours = Number(this._customHours || 0) + Number(this._customMinutes || 0) / 60;
+      if (!(hours >= 1 / 60)) {
+        this._customError = localize(this.hass, "duration.too_short");
+        return undefined;
+      }
+      duration = Math.round(hours * 1000) / 1000;
+    }
+    this._customError = undefined;
+    this._customOpen = false;
+    return this._selectDuration(duration);
+  }
+
+  _renderCustomDuration(active) {
+    const t = (key, vars) => localize(this.hass, key, vars);
+    const mode = this._customMode || "for";
+    const numberField = (key, label, value, max, step) => html`<label class="field">
+      ${label}
+      <div class="input">
+        <button type="button" @click=${() => this._customStep(key, -step)}>−</button>
+        <input
+          type="number"
+          inputmode="numeric"
+          min="0"
+          max=${max}
+          .value=${String(value ?? 0)}
+          @change=${(ev) => {
+            const v = Math.max(0, Math.round(Number(ev.target.value) || 0));
+            if (key === "hours") this._customHours = Math.min(999, v);
+            else this._customMinutes = Math.min(59, v);
+            this._customError = undefined;
+          }}
+        />
+        <button type="button" @click=${() => this._customStep(key, step)}>+</button>
+      </div>
+    </label>`;
+    return html`
+      <div class="custom">
+        <div class="custom-modes">
+          <button class="dur ${mode === "for" ? "selected" : ""}" @click=${() => (this._customMode = "for")}>
+            ${t("duration.custom_for")}
+          </button>
+          <button class="dur ${mode === "until" ? "selected" : ""}" @click=${() => (this._customMode = "until")}>
+            ${t("duration.custom_until")}
+          </button>
+        </div>
+        ${mode === "for"
+          ? html`<div class="custom-fields">
+              ${numberField("hours", t("duration.custom_hours"), this._customHours, 999, 1)}
+              ${numberField("minutes", t("duration.custom_minutes"), this._customMinutes, 59, 15)}
+            </div>`
+          : html`<label class="field">
+              ${t("duration.custom_end")}
+              <div class="input">
+                <input
+                  type="datetime-local"
+                  .value=${this._customUntil || ""}
+                  min=${toLocalInput(new Date())}
+                  @input=${(ev) => {
+                    this._customUntil = ev.target.value;
+                    this._customError = undefined;
+                  }}
+                />
+              </div>
+            </label>`}
+        ${this._customError ? html`<div class="message error">${this._customError}</div>` : nothing}
+        <div class="custom-actions">
+          <span class="note">${active ? t("duration.custom_hint_active") : t("duration.custom_hint_idle")}</span>
+          <button class="small-btn primary" @click=${() => this._applyCustom()}>
+            ${active ? t("duration.apply_active") : t("duration.apply")}
+          </button>
         </div>
       </div>
     `;
