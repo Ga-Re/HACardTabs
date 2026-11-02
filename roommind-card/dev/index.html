@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RoomMind Card – Dev</title>
+    <style>
+      :root {
+        --primary-color: #03a9f4;
+        --rgb-primary-color: 3, 169, 244;
+        --primary-text-color: #212121;
+        --rgb-primary-text-color: 33, 33, 33;
+        --secondary-text-color: #727272;
+        --text-primary-color: #fff;
+        --divider-color: rgba(0, 0, 0, 0.12);
+        --card-background-color: #fff;
+        --error-color: #db4437;
+        --warning-color: #ffa600;
+        font-family: Roboto, Arial, sans-serif;
+      }
+      body.dark {
+        --primary-text-color: #e1e1e1;
+        --rgb-primary-text-color: 225, 225, 225;
+        --secondary-text-color: #9b9b9b;
+        --divider-color: rgba(225, 225, 225, 0.12);
+        --card-background-color: #1c1c1c;
+        background: #111 !important;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #f0f2f5;
+        color: var(--primary-text-color);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 400px));
+        gap: 16px;
+        align-items: start;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      import * as MDI from "../node_modules/@mdi/js/mdi.js";
+      window.MDI = MDI;
+    </script>
+    <script src="./mock-hass.js"></script>
+    <script type="module">
+      import "../dist/roommind-card.js";
+      const hass = window.createMockHass();
+      const configs = window.__configs || [
+        { type: "custom:roommind-card", entity: "climate.roommind_arbeitszimmer" },
+        { type: "custom:roommind-card", entity: "climate.roommind_wohnzimmer", durations: ["schedule", 0.5, 1, 3, "permanent"], compact: true },
+      ];
+      const cards = configs.map((config) => {
+        const card = document.createElement("roommind-card");
+        card.setConfig(config);
+        card.hass = hass;
+        document.getElementById("grid").appendChild(card);
+        return card;
+      });
+      window.onHassUpdate((h) => cards.forEach((c) => (c.hass = h)));
+      window.__cards = cards;
+    </script>
+  </body>
+</html>

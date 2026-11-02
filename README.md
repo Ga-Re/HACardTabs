@@ -374,6 +374,12 @@ swipe-follow gestures, overflow arrows/menu and responsive options for narrow ca
 Install it via HACS as a custom repository (type **Dashboard**) and add the card **Card Tabs**
 (`type: custom:hacard-tabs`). See the YAML reference above for all options.
 
+## Weitere Karte: RoomMind Card
+
+Im Ordner [`roommind-card/`](roommind-card/) liegt eine eigenständige Karte zum Steuern von Räumen der Integration
+[RoomMind](https://github.com/snazzybean/roommind) (Zieltemperatur, Override-Laufzeit, Presets, Fenster, Urlaub …).
+Details und Installation stehen in der [README der Karte](roommind-card/README.md).
+
 ## Lizenz
 
 MIT

@@ -1,0 +1,31 @@
+{
+  "name": "roommind-card",
+  "version": "1.0.0",
+  "description": "Home Assistant Lovelace card to control rooms of the RoomMind integration – target temperature, override duration, presets, modes, windows and more.",
+  "type": "module",
+  "main": "dist/roommind-card.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c --watch",
+    "dev": "rollup -c --watch & http-server -c-1 -p 5056 ."
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "custom-card",
+    "roommind",
+    "climate",
+    "hacs"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.3.0"
+  },
+  "devDependencies": {
+    "@mdi/js": "^7.4.47",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-terser": "^1.0.0",
+    "http-server": "^14.1.1",
+    "rollup": "^4.40.0"
+  }
+}

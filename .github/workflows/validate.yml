@@ -20,6 +20,24 @@ jobs:
       - name: Check that dist/ is up to date
         run: git diff --exit-code -- dist/
 
+  roommind-card:
+    name: Build RoomMind Card
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: roommind-card
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: roommind-card/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Check that dist/ is up to date
+        run: git diff --exit-code -- dist/
+
   hacs:
     name: HACS validation
     runs-on: ubuntu-latest
